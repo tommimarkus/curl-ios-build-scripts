@@ -57,11 +57,11 @@ module CurlBuilder
     def platform_for(architecture)
       case architecture
       when "x86_64"
-        setup(:osx_sdk_version) == "none" ? "iPhoneSimulator" : "MacOSX"
+        setup(:osx_sdk_version) == "none" ? (setup(:tvos_sdk_version) == "none" ? "iPhoneSimulator" : "AppleTVSimulator") : "MacOSX"
       when "i386"
-        "iPhoneSimulator"
+        setup(:tvos_sdk_version) == "none" ? "iPhoneSimulator" : "AppleTVSimulator"
       else
-        "iPhoneOS"
+        setup(:tvos_sdk_version) == "none" ? "iPhoneOS" : "AppleTVOS"
       end
     end
 
@@ -83,9 +83,15 @@ module CurlBuilder
       tool
     end
 
+    if setup(:bitcode)
+      embed_bitcode = "-fembed-bitcode"
+    end
+
     def sdk_version_for(platform)
       if platform == "iPhoneOS" || platform == "iPhoneSimulator"
         setup(:sdk_version)
+      elsif platform == "AppleTVOS" || platform == "AppleTVSimulator"
+        setup(:tvos_sdk_version)
       else
         setup(:osx_sdk_version)
       end
@@ -98,6 +104,8 @@ module CurlBuilder
       elsif platform == "iPhoneOS"
         version = architecture == "arm64" ? "6.0" : "5.0"
         min_version = "-miphoneos-version-min=#{version}"
+      elsif platform == "AppleTVOS" || platform == "AppleTVSimulator"
+        min_version = "-mtvos-version-min=9.0"
       else
         min_version = "-mmacosx-version-min=10.7"
       end
@@ -107,7 +115,7 @@ module CurlBuilder
 
       {
         ldflags: "-arch #{architecture} -pipe -isysroot #{sdk}",
-        cflags:  "-arch #{architecture} -pipe -isysroot #{sdk} #{min_version}"
+        cflags:  "-arch #{architecture} -pipe -isysroot #{sdk} #{min_version} #{embed_bitcode}"
       }
     end
 
@@ -141,6 +149,7 @@ module CurlBuilder
         --host=#{host}
         --disable-shared
         --enable-static
+        --disable-ntlm-wb
         #{flags.join(" ")}
         --prefix="#{output_dir_for architecture}"
       }
